@@ -10,12 +10,13 @@
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 
-int directPin = 3;      //This pin sets the directPinion for the motor to move.  We may need two of these outputs for the z-directPinion.
-int xMotor = 2;         //This pin is the pulse output for the motor.  Again, we may need two of these pins.
+int directPin = 7;      //This pin sets the directPinion for the motor to move.  We may need two of these outputs for the z-directPinion.
+int xMotor = 6;         //This pin is the pulse output for the X-direction motor.  Again, we may need two of these pins.
 int steps = 0;          //This is the number of steps we'll move the motor.  Default to zero steps for safety.
 int limitSwitch = 12;   //We will be using this pin for the limit switch motor stop function.  
 int trigger = 13;       //This pin will be used to trigger the spectrometer. 
-boolean directVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
+int interrupt = A0;      //The interrupt pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
+boolean directVar = false;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
 boolean directCondition = false; //The variable used to verify the direction of the motor movement.
 boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
 boolean dataCondition = false;
@@ -30,7 +31,7 @@ int xDataPoints = 0;
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void setup() {
-
+  pinMode(interrupt,INPUT);
   pinMode(directPin,OUTPUT);
   pinMode(xMotor,OUTPUT);
   pinMode(limitSwitch,INPUT);
@@ -66,14 +67,19 @@ void ExecuteMeasurement() {
       //wait 
     }
     int c = Serial.read();
+    int g = 1;
+    int h = 1;
     if (c == 'y' || c == 'Y') {
       for (int i = xDataPoints; i > 0; i--) {
-        moveMotor(directVar,steps,xMotor);
+        g = moveMotor(directVar,steps,xMotor);
         delay(50);
         specTrigger();
         delay(50);
       }
-      returnMotor(directVar,steps,xDataPoints,xMotor);
+      h = returnMotor(directVar,steps,xDataPoints,xMotor);
+      if (g == 0 || h == 0) {
+        Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
+      }
       xMeasureExecute = true;
     } 
     else if (c == 'n' || c == 'N') {
@@ -84,6 +90,7 @@ void ExecuteMeasurement() {
     }
   } 
 }
+
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOVE MOTOR
@@ -96,18 +103,24 @@ void ExecuteMeasurement() {
  by the set number of steps.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void moveMotor(int dir, int stepNumber, int motorChoice) {
+int moveMotor(int dir, int stepNumber, int motorChoice) {
   // digitalWrite(directPin,dir);
   Serial.print("Moving the stepper motor in the ");
   Serial.print(dir);
   Serial.println(" direction.");
   delay(1);
   for (int i = stepNumber; i > 0; i--) {
+    if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
+      return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
+    }                                   //(using the circuit Dr. Durfee and I  talked about).
     // digitalWrite(motorChoice,HIGH);
     delay(10);
     // digitalWrite(motorChoice,LOW);
     delay(10);
+    
+    
   }
+  return 1;
 }
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOTOR RETURN
@@ -118,34 +131,20 @@ void moveMotor(int dir, int stepNumber, int motorChoice) {
  we should create a return home position.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
-
-
+int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
   int stepLength = stepNumber * dataPoints;
   Serial.print("Returning the stepper motor from the ");
   Serial.print(dir);
   Serial.print(" direction, by ");
   Serial.print(stepLength);
   Serial.println(" steps");
-
   dir = !dir;
-  
-  moveMotor(dir,stepLength,motorChoice);
-  
-  //  digitalWrite(directPin, dir);
-/*  delay(10);
-
-  for (int i = stepLength; i > 0; i--) {
-    delay(10);
-    //   digitalWrite(motorChoice,HIGH);
-    delay(10);
-    //  digitalWrite(motorChoice,LOW);
-    Serial.println("derp");
-    delay(10);
-  }*/
+  int g = 1;
+  g = moveMotor(dir,stepLength,motorChoice);
   directCondition = false;
   stepVerify = false;
   dataCondition = false;
+  return g;
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -293,6 +292,7 @@ void  setSteps() {
  else {  
  }
  }*/
+
 
 
 
