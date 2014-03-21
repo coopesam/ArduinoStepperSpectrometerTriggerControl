@@ -16,7 +16,6 @@ int directVar = 0;      //This variable is either 0 or 1 or true or false, which
 boolean directCondition = false; //The variable used to verify the direction of the motor movement.
 boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
 boolean dataCondition = false;
-boolean xMeasureExecute = false;
 int xDataPoints = 0; 
 int variable = 1;
 
@@ -57,6 +56,7 @@ void loop() {
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
   void ExecuteMeasurement() {
+    boolean xMeasureExecute = false;
     dataPoints();
     selectDirection();
     setSteps();
@@ -75,6 +75,7 @@ void loop() {
           specTrigger();
           delay(100);
         }
+        
         h = returnMotor(directVar,steps,xDataPoints,xMotor);
         if (g == 0 || h == 0) {
           Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
@@ -131,6 +132,21 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
+  boolean returnCondition = false;
+  while(!returnCondition) {
+    Serial.println("\n\n\nReady to return motor?");
+    while(!(Serial.available() > 0)) {
+      //wait
+    }
+    char c = Serial.read();
+    if (c=='y' || c=='Y') {
+      returnCondition = true;
+    }
+    else {
+      Serial.println('\n\n\n\n\n\n\n\nBUMMER!');
+      returnCondition = false;
+    }
+  }
   int stepLength = stepNumber * dataPoints;
   Serial.print("Returning the stepper motor from the ");
   Serial.print(dir);
@@ -168,30 +184,29 @@ void specTrigger() {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void selectDirection() {
+  char dir;
   while(!directCondition) {
-    Serial.println("\n\n\nWhat direction? (l/L or r/R for left or right)");
+    Serial.println("\n\n\nWhat direction? (l/L or r/R for left or right) (right = into the beam)");
     while(!(Serial.available() > 0)) {
       //wait
     }
     char c = Serial.read();
     if (c=='l' || c=='L') {
-      directVar = 1;
-      directCondition = true;
-    }
-    else if(c=='r' || c=='R') {
       directVar = 0;
       directCondition = true;
     }
+    else if(c=='r' || c=='R') {
+      directVar = 1;
+      directCondition = true;
+    }
+    dir = c;
   }
   if(directCondition) {
     Serial.print("You've selected the ");
-    Serial.print(directVar);
+    Serial.print(dir);
     Serial.println(" direction");  
   }
 }
-
-
-
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SET NUMBER OF DATA POINTS
@@ -202,7 +217,7 @@ void selectDirection() {
 
 void dataPoints() {
   while(!dataCondition) {
-    Serial.println("\n \n \nHow many data points will you collect?");
+    Serial.println("\n\n\nHow many spectra will you collect?");
     while(!(Serial.available() > 0)) {
       //wait
     }
@@ -291,18 +306,4 @@ void  setSteps() {
  else {  
  }
  }*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
