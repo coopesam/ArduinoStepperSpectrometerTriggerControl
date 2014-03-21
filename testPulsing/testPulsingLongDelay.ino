@@ -71,9 +71,9 @@ void loop() {
       if (c == 'y' || c == 'Y') {
         for (int i = xDataPoints; i > 0; i--) {
           g = moveMotor(directVar,steps,xMotor);
-          delay(500);
+          delay(100);
           specTrigger();
-          delay(500);
+          delay(100);
         }
         h = returnMotor(directVar,steps,xDataPoints,xMotor);
         if (g == 0 || h == 0) {
@@ -107,7 +107,7 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
   Serial.print("Moving the stepper motor in the ");
   Serial.print(dir);
   Serial.println(" direction.");
-  delay(100);
+  delay(80);
   for (int i = stepNumber; i > 0; i--) {
    // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
    //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
