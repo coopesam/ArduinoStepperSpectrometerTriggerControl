@@ -37,6 +37,8 @@ void setup() {
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
+  Serial.println("Enter commands like this:");
+  Serial.println("Command, stepSize, steps. [Yes, include commas and period at the end]\n");
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,7 +57,7 @@ void loop() {
     {
         command = Serial.readStringUntil(',');
         stepSize = Serial.readStringUntil(',');
-        steps = Serial.readStringUntil(',');
+        steps = Serial.readStringUntil('.');
         runCommand(command, stepSize, steps);
     }
 }
