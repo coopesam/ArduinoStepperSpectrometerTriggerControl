@@ -37,7 +37,7 @@ void setup() {
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
-  Serial.println("Enter commands like this:");
+  Serial.println("\nEnter commands like this:");
   Serial.println("Command, stepSize, steps. [Yes, include commas and period at the end]\n");
 }
 
@@ -49,20 +49,40 @@ void setup() {
 
 void loop() {
   // from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
-  String command;
-  String stepSize;
-  String steps;
+  String command = "";
+  String stepSize = 0;
+  String steps = 0;
 
     if(Serial.available() > 0)
     {
         command = Serial.readStringUntil(',');
         stepSize = Serial.readStringUntil(',');
         steps = Serial.readStringUntil('.');
-        runCommand(command, stepSize, steps);
+        runCommand(command, stepSize.toInt(), steps.toInt());
     }
 }
 
-void runCommand(String cmd, String ss, String s) {
+void printHelp() {
+  Serial.println("\n\nWelcome to our help menu!\n");
+  Serial.println("----- Available Commands: -----");
+  Serial.println("MoveMotor");
+  Serial.println("MoveToZero");
+}
+
+void runCommand(String cmd, int ss, int s) {
+    if (cmd.toLowerCase() == "help") {
+      printHelp();
+    } else {
+      if (cmd == "") {
+        Serial.println("Weird, your command did not register!");
+      }
+      if (ss == 0) {
+        Serial.println("Please enter a valid step size! (2nd param)");
+      }
+      if (s == 0) {
+        Serial.println("Please enter a valid number of steps! (3rd param)");
+      }
+    }
     Serial.print("\nCommand ");
     Serial.print(cmd);
     Serial.print(": ");
