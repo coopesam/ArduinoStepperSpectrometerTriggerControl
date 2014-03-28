@@ -83,7 +83,7 @@ void loop() {
         xMeasureExecute = true;
       } 
       else if (c == 'n' || c == 'N') {
-        Serial.println("Why not? \n \n");
+        Serial.println("Why not? You should close the serial port and start over now. \n\n");
       } 
       else {
 
@@ -110,17 +110,20 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
   Serial.println(" direction.");
   delay(80);
   for (int i = stepNumber; i > 0; i--) {
-   // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
-   //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
-   // }                                   //(using the circuit Dr. Durfee and I  talked about).
+    // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
+    //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
+    // }                                   //(using the circuit Dr. Durfee and I  talked about).
+    // Alex's idea:
+    // - When interrupt happens, assign a variable to false
+    // - in this loop, we continue to check if this variable is true. Once it goes
+    //   false, we stop looping and print out the error to the console log.
+
     digitalWrite(motorChoice,HIGH);
     delay(100);
     digitalWrite(motorChoice,LOW);
     delay(100);
-
-
   }
- return 1;
+  return 1;
 }
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOTOR RETURN
@@ -265,11 +268,6 @@ void  setSteps() {
     }
   }
 }
-
-
-
-
-
 
 /* My first attempt at creating a function that verfies inputs, and sets global values.
  
