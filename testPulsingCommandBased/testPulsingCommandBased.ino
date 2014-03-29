@@ -1,9 +1,9 @@
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  Things to do: 1) Make stepper acceleration ramp (most likely through a function of delay() length decreases).
  2) add in the limit switch abort to the moveMotor() command
  3) Add in the z-direction motor
  
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 // This is our attempt at making the code command - based through serial port.
 
@@ -14,7 +14,8 @@ int limitSwitch = 12;   //We will be using this pin for the limit switch motor s
 int trigger = 13;       //This pin will be used to trigger the spectrometer.
 int interrupt = A0;      //The interrupt pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
 
-int steps = 0;          //This is the number of steps we'll move the motor between each measurement.  Default to zero steps for safety.
+int xSteps = 0;          //This is the number of steps we'll move the x motor between each measurement.  Default to zero steps for safety.
+int zSteps = 0;          //This is the number of steps we'll move the z motor between each measurement.  Default to zero steps for safety.
 int directVar = 0;      //This variable is for the direction of movement. 1 = right (into the beam / away from the motor);
 boolean directCondition = false; //The variable used to verify the direction of the motor movement.
 boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
@@ -22,11 +23,11 @@ boolean dataCondition = false;
 int xDataPoints = 0; 
 int variable = 1;
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SETUP
  
  Setting up the Arduino board and program for use.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void setup() {
   pinMode(interrupt, INPUT);
@@ -43,11 +44,11 @@ void setup() {
   Serial.println("Command, stepSize, steps. [Yes, include commas and period at the end]\n");
 }
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  BODY
  
  The body of our Arduino action.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void loop() {
   // from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
@@ -71,22 +72,22 @@ void printHelp() {
   Serial.println(" - print all settings variables to the screen.");
   Serial.println("MoveMotor ()");
   Serial.println(" - params:\n");
-  Serial.println("MoveToZero ()");
-  Serial.println(" - params:\n");
   Serial.println("SetDirection (char dir)");
   Serial.println(" - params: dir = (Left / Right) direction for motor to initially move.");
   Serial.println(" - note: right = into beam -or- away from motor.\n");
   Serial.println("SetMeasurementNumber (int pointsToTake)");
   Serial.println(" - params: pointsToTake = number of spectra to collect.\n");
-  Serial.println("SetSteps (int steps)");
+  Serial.println("SetStepsBetween (int steps)");
   Serial.println(" - params: steps = # steps for motor to move between each measurement.\n");
   Serial.println("\n\nType a command!");
   
   // Other possibly useful commands:
   // Serial.println("ReturnMotor ()");
   // Serial.println(" - params: not sure.");
-  // Serial.println("MoveTo (location)");
+  // Serial.println("MoveTo (X, Y)");
   // Serial.println(" - params: location = where to move motor to. (possibly 2D)");
+  // Serial.println("MoveToZero ()");
+  // Serial.println(" - params:\n");
   // Serial.println("TakeSpectrum ()");
   // Serial.println(" - takes spectrum at current location.");
 }
@@ -100,13 +101,11 @@ void runCommand(String cmd, String p1, String p2) {
       // GetSettings();
     } else if ( cmd.equals("movemotor") ) {
       // MoveMotor();
-    } else if ( cmd.equals("movetozero") ) {
-      // MoveToZero();
     } else if ( cmd.equals("setdirection") ) {
       // SetDirection();
     } else if ( cmd.equals("setmeasurementnumber") ) {
       // SetMeasurementNumber();
-    } else if ( cmd.equals("setsteps") ) {
+    } else if ( cmd.equals("setstepsbetween") ) {
       // SetSteps();
     } else {
       if (cmd == "") {
@@ -139,11 +138,11 @@ void runCommand(String cmd, String p1, String p2) {
     }
 }
 
-  /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    EXECUTE CODE
    
    This code combines all of the commands together and runs a program.
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
   void ExecuteMeasurement() {
     boolean xMeasureExecute = false;
@@ -182,7 +181,7 @@ void runCommand(String cmd, String p1, String p2) {
   }
 
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOVE MOTOR
  
  This function is what pulses the motor.  The arguments are
@@ -191,7 +190,7 @@ void runCommand(String cmd, String p1, String p2) {
  x-direction (xMotor).  When this function is called, it will
  first write the direction, then begin then move the motor
  by the set number of steps.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 int moveMotor(int dir, int stepNumber, int motorChoice) {
   digitalWrite(directPin,dir);
@@ -215,31 +214,53 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
   }
   return 1;
 }
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// New version - command based:
+
+void MoveMotor() {
+  // Tell motor which direction to move:
+  digitalWrite(directPin, directVar);
+  
+  Serial.print("Moving the stepper motor in the ");
+  if (directVar == 0) {
+    Serial.println("0 / Left / Out of Beam / Toward Motor");
+  } else if (directVar == 1) {
+    Serial.println("1 / Right / Into Beam / Away From Motor");
+  }
+  Serial.println(" direction.");
+  
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(xMotor, HIGH);
+    delay(100);
+    digitalWrite(xMotor, LOW);
+    delay(100);
+  }
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOTOR RETURN
  
  The next function returns the motor the the previous position
  before measurements were taken.
  When we are able to get a distance measurement feedback,
  we should create a return home position.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
-  boolean returnCondition = false;
-  while(!returnCondition) {
-    Serial.println("\n\n\nReady to return motor?");
-    while(!(Serial.available() > 0)) {
-      //wait
-    }
-    char c = Serial.read();
-    if (c=='y' || c=='Y') {
-      returnCondition = true;
-    }
-    else {
-      Serial.println('\n\n\n\n\n\n\n\nBUMMER!');
-      returnCondition = false;
-    }
-  }
+//  boolean returnCondition = false;
+//  while(!returnCondition) {
+//    Serial.println("\n\n\nReady to return motor?");
+//    while(!(Serial.available() > 0)) {
+//      //wait
+//    }
+//    char c = Serial.read();
+//    if (c=='y' || c=='Y') {
+//      returnCondition = true;
+//    }
+//    else {
+//      Serial.println('\n\n\n\n\n\n\n\nBUMMER!');
+//      returnCondition = false;
+//    }
+//  }
   int stepLength = stepNumber * dataPoints;
   Serial.print("Returning the stepper motor from the ");
   Serial.print(dir);
@@ -254,13 +275,13 @@ int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
   return g;
 }
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SPECTROMETER TRIGGER
  
  The following function is the trigger pulse to the spectrometer.
  A pulse will be sent out after every movement.  
  Delays should be used in the void loop when calling it out.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 void specTrigger() {
   Serial.println("Triggering the spectrometer. . .");
   delay(100);
@@ -269,13 +290,13 @@ void specTrigger() {
   digitalWrite(trigger,LOW);
   delay(100);
 }
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  DIRECTION SELECTION 
  
  This function asks for and sets the direction of the motor
  through the serial monitor.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 void selectDirection() {
   char dir;
   while(!directCondition) {
@@ -301,12 +322,12 @@ void selectDirection() {
   }
 }
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SET NUMBER OF DATA POINTS
  
  This function prompts the user for the number of data points to take, then
  sets this number for the return, and the move/trigger execution.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void dataPoints() {
   while(!dataCondition) {
@@ -324,12 +345,12 @@ void dataPoints() {
   }
 }
 
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  INCREMENT SIZE (BETWEEN MEASUREMENTS)
  
  Function to set the number of steps that the motor will move.  
  This will be based on the stepsize measurement on the driver.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void  setSteps() {
   char sizeCheck = 'n';
@@ -358,6 +379,10 @@ void  setSteps() {
     }
   }
 }
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  PRINT SETTINGS TO SERIAL MONITOR
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
  
 void GetSettings() {
   Serial.println("\n\n====== Current System Parameters: ======");
@@ -378,4 +403,3 @@ void GetSettings() {
   Serial.print("Steps per Measurement: ");
   Serial.println(steps);
 }
-
