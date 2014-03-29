@@ -7,19 +7,20 @@
 
 // This is our attempt at making the code command - based through serial port.
 
-int directPin = 7;      //This pin sets the directPinion for the motor to move.  We may need two of these outputs for the z-directPinion.
+// Pins connecting to Arduino:
+int directPin = 7;      //This pin sets the directionPin for the motor to move.  We may need two of these outputs for the z-directionPin.
 int xMotor = 6;         //This pin is the pulse output for the X-direction motor.  Again, we may need two of these pins.
-int steps = 0;          //This is the number of steps we'll move the motor.  Default to zero steps for safety.
-int limitSwitch = 12;   //We will be using this pin for the limit switch motor stop function.  
-int trigger = 13;       //This pin will be used to trigger the spectrometer. 
+int limitSwitch = 12;   //We will be using this pin for the limit switch motor stop function.
+int trigger = 13;       //This pin will be used to trigger the spectrometer.
 int interrupt = A0;      //The interrupt pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
-int directVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
+
+int steps = 0;          //This is the number of steps we'll move the motor between each measurement.  Default to zero steps for safety.
+int directVar = 0;      //This variable is for the direction of movement. 1 = right (into the beam / away from the motor);
 boolean directCondition = false; //The variable used to verify the direction of the motor movement.
 boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
 boolean dataCondition = false;
 int xDataPoints = 0; 
 int variable = 1;
-
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SETUP
@@ -28,12 +29,13 @@ int variable = 1;
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void setup() {
-  pinMode(interrupt,INPUT);
-  pinMode(directPin,OUTPUT);
-  pinMode(xMotor,OUTPUT);
-  pinMode(limitSwitch,INPUT);
-  pinMode(trigger,OUTPUT);
-  digitalWrite(trigger,LOW);
+  pinMode(interrupt, INPUT);
+  pinMode(directPin, OUTPUT);
+  pinMode(xMotor, OUTPUT);
+  pinMode(limitSwitch, INPUT);
+  pinMode(trigger, OUTPUT);
+  digitalWrite(trigger, LOW);
+  
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
@@ -50,46 +52,91 @@ void setup() {
 void loop() {
   // from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
   String command = "";
-  String stepSize = 0;
-  String steps = 0;
+  String param1 = 0;
+  String param2 = 0;
 
     if(Serial.available() > 0)
     {
         command = Serial.readStringUntil(',');
         stepSize = Serial.readStringUntil(',');
         steps = Serial.readStringUntil('.');
-        runCommand(command, stepSize.toInt(), steps.toInt());
+        runCommand(command, param1, param2);
     }
 }
 
 void printHelp() {
   Serial.println("\n\nWelcome to our help menu!\n");
   Serial.println("----- Available Commands: -----");
-  Serial.println("MoveMotor");
-  Serial.println("MoveToZero");
+  Serial.println("GetSettings ()");
+  Serial.println(" - print all settings variables to the screen.");
+  Serial.println("MoveMotor ()");
+  Serial.println(" - params:\n");
+  Serial.println("MoveToZero ()");
+  Serial.println(" - params:\n");
+  Serial.println("SetDirection (char dir)");
+  Serial.println(" - params: dir = (Left / Right) direction for motor to initially move.");
+  Serial.println(" - note: right = into beam -or- away from motor.\n");
+  Serial.println("SetMeasurementNumber (int pointsToTake)");
+  Serial.println(" - params: pointsToTake = number of spectra to collect.\n");
+  Serial.println("SetSteps (int steps)");
+  Serial.println(" - params: steps = # steps for motor to move between each measurement.\n");
+  Serial.println("\n\nType a command!");
+  
+  // Other possibly useful commands:
+  // Serial.println("ReturnMotor ()");
+  // Serial.println(" - params: not sure.");
+  // Serial.println("MoveTo (location)");
+  // Serial.println(" - params: location = where to move motor to. (possibly 2D)");
+  // Serial.println("TakeSpectrum ()");
+  // Serial.println(" - takes spectrum at current location.");
 }
 
-void runCommand(String cmd, int ss, int s) {
-    if (cmd.toLowerCase() == "help") {
+void runCommand(String cmd, String p1, String p2) {
+    int err = 0;
+    cmd.toLowerCase();
+    if ( cmd.equals("help") ) {
       printHelp();
+    } else if ( cmd.equals("getsettings") ) {
+      // GetSettings();
+    } else if ( cmd.equals("movemotor") ) {
+      // MoveMotor();
+    } else if ( cmd.equals("movetozero") ) {
+      // MoveToZero();
+    } else if ( cmd.equals("setdirection") ) {
+      // SetDirection();
+    } else if ( cmd.equals("setmeasurementnumber") ) {
+      // SetMeasurementNumber();
+    } else if ( cmd.equals("setsteps") ) {
+      // SetSteps();
     } else {
       if (cmd == "") {
         Serial.println("Weird, your command did not register!");
+        err++;
       }
       if (ss == 0) {
         Serial.println("Please enter a valid step size! (2nd param)");
+        err++;
       }
       if (s == 0) {
         Serial.println("Please enter a valid number of steps! (3rd param)");
+        err++;
       }
+      // If there is an error, no command will be run.
+      if (err == 0) {
+        if (cmd.equalsIgnoreCase("MoveMotor") ) {
+          
+        } else if (cmd.equalsIgnoreCase("MoveToZero") ) {
+          
+        }
+      }
+      Serial.print("\nCommand ");
+      Serial.print(cmd);
+      Serial.print(": ");
+      Serial.print(ss);
+      Serial.print(", ");
+      Serial.print(s);
+      Serial.print("\n\n");
     }
-    Serial.print("\nCommand ");
-    Serial.print(cmd);
-    Serial.print(": ");
-    Serial.print(ss);
-    Serial.print(", ");
-    Serial.print(s);
-    Serial.print("\n\n");
 }
 
   /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -311,41 +358,24 @@ void  setSteps() {
     }
   }
 }
-
-/* My first attempt at creating a function that verfies inputs, and sets global values.
  
- void selectDirection() { 
- if (!directCondition) {
- Serial.println("What direction?");
- while (!directCondition) {
- if(Serial.available() > 0 ){
- char c;
- c = Serial.read();
- switch (c) {
- case 'l':
- case 'L':
- directVar = 1;
- directCondition = true;
- break;
- case 'r':
- case 'R':
- directVar = 0;
- directCondition = true;
- break;
- default:
- Serial.println("Pick a value L/l or R/r for left or right");
- break;
- }
- if(directCondition){
- Serial.print("You've selected the ");
- Serial.print(directVar);
- Serial.println(" direction");
- }
- }
- }
- } 
- else {  
- }
- }*/
- //boobs
+void GetSettings() {
+  Serial.println("\n\n====== Current System Parameters: ======");
+  // directVar:
+  Serial.print("Direction: ");
+  if (directVar == 0) {
+    Serial.println("0 / Left / Out of Beam / Toward Motor.");
+  } else if (directVar == 1) {
+    Serial.println("1 / Right / Into Beam / Away From Motor.");
+  } else {
+    Serial.print("Not a valid number - ");
+    Serial.println(directVar);
+  }
+  // xDataPoints:
+  Serial.print("Number of Measurements [x-axis]: ");
+  Serial.println(xDataPoints);
+  // steps:
+  Serial.print("Steps per Measurement: ");
+  Serial.println(steps);
+}
 
