@@ -20,7 +20,8 @@ int directVar = 0;      //This variable is for the direction of movement. 1 = ri
 boolean directCondition = false; //The variable used to verify the direction of the motor movement.
 boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
 boolean dataCondition = false;
-int xDataPoints = 0; 
+int xDataPoints = 0;
+int zDataPoints = 0;
 int variable = 1;
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,7 +42,8 @@ void setup() {
   Serial.begin(115200);
   while(!Serial);
   Serial.println("\nEnter commands like this:");
-  Serial.println("Command, stepSize, steps. [Yes, include commas and period at the end]\n");
+  Serial.println("Command,parameter1,parameter2. [no spaces please]");
+  Serial.println("(Type 'help' for a list of commands)\n");
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -53,32 +55,42 @@ void setup() {
 void loop() {
   // from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
   String command = "";
-  String param1 = 0;
-  String param2 = 0;
+  String param1 = "";
+  String param2 = "";
 
-    if(Serial.available() > 0)
-    {
-        command = Serial.readStringUntil(',');
-        stepSize = Serial.readStringUntil(',');
-        steps = Serial.readStringUntil('.');
-        runCommand(command, param1, param2);
-    }
+  if(Serial.available() > 0)
+  {
+    command = Serial.readStringUntil(',');
+    param1 = Serial.readStringUntil(',');
+    param2 = Serial.readStringUntil('.');
+    runCommand(command, param1, param2);
+  }
 }
 
-void printHelp() {
+void PrintHelp() {
   Serial.println("\n\nWelcome to our help menu!\n");
   Serial.println("----- Available Commands: -----");
   Serial.println("GetSettings ()");
   Serial.println(" - print all settings variables to the screen.");
+  Serial.println("GetSpectrum ()");
+  Serial.println(" - gets spectrum at current location.");
   Serial.println("MoveMotor ()");
+  Serial.println(" - moves motor in x direction only AND not back & forth.");
   Serial.println(" - params:\n");
+  Serial.println("RunMotor ()");
+  Serial.println(" - MAIN RUNNING FUNCTION");
+  Serial.println(" - runs motor forwards and backwards, according to steps, dir, pointsToTake, etc.\n");
   Serial.println("SetDirection (char dir)");
   Serial.println(" - params: dir = (Left / Right) direction for motor to initially move.");
   Serial.println(" - note: right = into beam -or- away from motor.\n");
-  Serial.println("SetMeasurementNumber (int pointsToTake)");
-  Serial.println(" - params: pointsToTake = number of spectra to collect.\n");
-  Serial.println("SetStepsBetween (int steps)");
-  Serial.println(" - params: steps = # steps for motor to move between each measurement.\n");
+  Serial.println("SetXMeasurements (int xPointsToTake)");
+  Serial.println(" - params: xPointsToTake = number of spectra to collect in x axis.\n");
+  Serial.println("SetZMeasurements (int zPointsToTake)");
+  Serial.println(" - params: zPointsToTake = number of spectra to collect in z axis.\n");
+  Serial.println("SetXSteps (int steps)");
+  Serial.println(" - params: steps = # steps for motor to move between each measurement [x-axis].\n");
+  Serial.println("SetZSteps (int steps)");
+  Serial.println(" - params: steps = # steps for motor to move between each measurement [z-axis].\n");
   Serial.println("\n\nType a command!");
   
   // Other possibly useful commands:
@@ -88,98 +100,95 @@ void printHelp() {
   // Serial.println(" - params: location = where to move motor to. (possibly 2D)");
   // Serial.println("MoveToZero ()");
   // Serial.println(" - params:\n");
-  // Serial.println("TakeSpectrum ()");
-  // Serial.println(" - takes spectrum at current location.");
 }
 
 void runCommand(String cmd, String p1, String p2) {
     int err = 0;
     cmd.toLowerCase();
     if ( cmd.equals("help") ) {
-      printHelp();
+      PrintHelp();
     } else if ( cmd.equals("getsettings") ) {
-      // GetSettings();
+      GetSettings();
+    } else if ( cmd.equals("getspectrum") ) {
+      SpecTrigger();
     } else if ( cmd.equals("movemotor") ) {
-      // MoveMotor();
+      MoveMotor(1);
+    } else if ( cmd.equals("runmotor") ) {
+      MoveMotor(2);
     } else if ( cmd.equals("setdirection") ) {
-      // SetDirection();
-    } else if ( cmd.equals("setmeasurementnumber") ) {
-      // SetMeasurementNumber();
-    } else if ( cmd.equals("setstepsbetween") ) {
-      // SetSteps();
+      SetDirection(p1);
+    } else if ( cmd.equals("setxmeasurements") ) {
+      SetXMeasurements(p1);
+    } else if ( cmd.equals("setzmeasurements") ) {
+      SetZMeasurements(p1);
+    } else if ( cmd.equals("setxsteps") ) {
+      SetXSteps(p1);
+    } else if ( cmd.equals("setzsteps") ) {
+      SetZSteps(p1);
     } else {
-      if (cmd == "") {
-        Serial.println("Weird, your command did not register!");
-        err++;
-      }
-      if (ss == 0) {
-        Serial.println("Please enter a valid step size! (2nd param)");
-        err++;
-      }
-      if (s == 0) {
-        Serial.println("Please enter a valid number of steps! (3rd param)");
-        err++;
-      }
-      // If there is an error, no command will be run.
-      if (err == 0) {
-        if (cmd.equalsIgnoreCase("MoveMotor") ) {
-          
-        } else if (cmd.equalsIgnoreCase("MoveToZero") ) {
-          
-        }
-      }
-      Serial.print("\nCommand ");
+      Serial.print("\nUnregistered Command: ");
       Serial.print(cmd);
       Serial.print(": ");
-      Serial.print(ss);
+      Serial.print(p1);
       Serial.print(", ");
-      Serial.print(s);
+      Serial.print(p2);
       Serial.print("\n\n");
     }
 }
 
-  /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   EXECUTE CODE
-   
-   This code combines all of the commands together and runs a program.
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ EXECUTE CODE
+ 
+ This code combines all of the commands together and runs a program.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-  void ExecuteMeasurement() {
-    boolean xMeasureExecute = false;
-    dataPoints();
-    selectDirection();
-    setSteps();
-    while (!xMeasureExecute) {
-      Serial.println("Run. . .? (Y/n)");
-      while (!(Serial.available() > 0)) {
-        //wait 
-      }
-      int c = Serial.read();
-      int g = 1;
-      int h = 1;
-      if (c == 'y' || c == 'Y') {
-        for (int i = xDataPoints; i > 0; i--) {
-          g = moveMotor(directVar,steps,xMotor);
-          delay(100);
-          specTrigger();
-          delay(100);
-        }
-        
-        h = returnMotor(directVar,steps,xDataPoints,xMotor);
-        if (g == 0 || h == 0) {
-          Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
-        }
-        xMeasureExecute = true;
-      } 
-      else if (c == 'n' || c == 'N') {
-        Serial.println("Why not? You should close the serial port and start over now. \n\n");
-      } 
-      else {
+// void ExecuteMeasurement() {
+  // boolean xMeasureExecute = false;
+  // dataPoints();
+  // selectDirection();
+  // setSteps();
+  // while (!xMeasureExecute) {
+  //   Serial.println("Run. . .? (Y/n)");
+  //   while (!(Serial.available() > 0)) {
+  //     //wait 
+  //   }
+  //   int c = Serial.read();
+  //   int g = 1;
+  //   int h = 1;
+  //   if (c == 'y' || c == 'Y') {
+  //     for (int i = xDataPoints; i > 0; i--) {
+  //       g = moveMotor(directVar,steps,xMotor);
+  //       delay(100);
+  //       specTrigger();
+  //       delay(100);
+  //     }
+      
+  //     h = returnMotor(directVar,steps,xDataPoints,xMotor);
+  //     if (g == 0 || h == 0) {
+  //       Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
+  //     }
+  //     xMeasureExecute = true;
+  //   } 
+  //   else if (c == 'n' || c == 'N') {
+  //     Serial.println("Why not? You should close the serial port and start over now. \n\n");
+  //   } 
+  //   else {
 
-      }
-    } 
+  //   }
+  // } 
+// }
+
+void RunMotor() {
+  for (int i = xDataPoints; i > 0; i--) {
+    MoveMotor(1);
+    delay(100);
+    SpecTrigger();
+    delay(100);
   }
-
+  
+  // Return Motor:
+  MoveMotor(1);
+}
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  MOVE MOTOR
@@ -192,32 +201,32 @@ void runCommand(String cmd, String p1, String p2) {
  by the set number of steps.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-int moveMotor(int dir, int stepNumber, int motorChoice) {
-  digitalWrite(directPin,dir);
-  Serial.print("Moving the stepper motor in the ");
-  Serial.print(dir);
-  Serial.println(" direction.");
-  delay(80);
-  for (int i = stepNumber; i > 0; i--) {
-    // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
-    //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
-    // }                                   //(using the circuit Dr. Durfee and I  talked about).
-    // Alex's idea:
-    // - When interrupt happens, assign a variable to false
-    // - in this loop, we continue to check if this variable is true. Once it goes
-    //   false, we stop looping and print out the error to the console log.
+// int moveMotor(int dir, int stepNumber, int motorChoice) {
+//   digitalWrite(directPin,dir);
+//   Serial.print("Moving the stepper motor in the ");
+//   Serial.print(dir);
+//   Serial.println(" direction.");
+//   delay(80);
+//   for (int i = stepNumber; i > 0; i--) {
+//     // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
+//     //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
+//     // }                                   //(using the circuit Dr. Durfee and I  talked about).
+//     // Alex's idea:
+//     // - When interrupt happens, assign a variable to false
+//     // - in this loop, we continue to check if this variable is true. Once it goes
+//     //   false, we stop looping and print out the error to the console log.
 
-    digitalWrite(motorChoice,HIGH);
-    delay(100);
-    digitalWrite(motorChoice,LOW);
-    delay(100);
-  }
-  return 1;
-}
+//     digitalWrite(motorChoice,HIGH);
+//     delay(100);
+//     digitalWrite(motorChoice,LOW);
+//     delay(100);
+//   }
+//   return 1;
+// }
 
 // New version - command based:
 
-void MoveMotor() {
+void MoveMotor(int directions) {
   // Tell motor which direction to move:
   digitalWrite(directPin, directVar);
   
@@ -230,10 +239,21 @@ void MoveMotor() {
   Serial.println(" direction.");
   
   for (int i = 0; i < steps; i++) {
-    digitalWrite(xMotor, HIGH);
-    delay(100);
-    digitalWrite(xMotor, LOW);
-    delay(100);
+    // if (!atLimit) { // limit switches activate this variable
+      digitalWrite(xMotor, HIGH);
+      delay(100);
+      digitalWrite(xMotor, LOW);
+      delay(100);
+    // }
+  }
+
+  if (directions == 2) {
+    directVar = !directVar;
+    ReturnMotor(0);
+  } else if (directions == 0) {
+    directVar = !directVar;
+  } else {
+    Serial.println("Done.");
   }
 }
 
@@ -245,35 +265,20 @@ void MoveMotor() {
  When we are able to get a distance measurement feedback,
  we should create a return home position.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
-//  boolean returnCondition = false;
-//  while(!returnCondition) {
-//    Serial.println("\n\n\nReady to return motor?");
-//    while(!(Serial.available() > 0)) {
-//      //wait
-//    }
-//    char c = Serial.read();
-//    if (c=='y' || c=='Y') {
-//      returnCondition = true;
-//    }
-//    else {
-//      Serial.println('\n\n\n\n\n\n\n\nBUMMER!');
-//      returnCondition = false;
-//    }
-//  }
-  int stepLength = stepNumber * dataPoints;
-  Serial.print("Returning the stepper motor from the ");
-  Serial.print(dir);
-  Serial.print(" direction, by ");
-  Serial.print(stepLength);
-  Serial.println(" steps");
-  dir = !dir;
-  int g = moveMotor(dir,stepLength,motorChoice);
-  directCondition = false;
-  stepVerify = false;
-  dataCondition = false;
-  return g;
-}
+// int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
+//   int stepLength = stepNumber * dataPoints;
+//   Serial.print("Returning the stepper motor from the ");
+//   Serial.print(dir);
+//   Serial.print(" direction, by ");
+//   Serial.print(stepLength);
+//   Serial.println(" steps");
+//   dir = !dir;
+//   int g = moveMotor(dir,stepLength,motorChoice);
+//   directCondition = false;
+//   stepVerify = false;
+//   dataCondition = false;
+//   return g;
+// }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SPECTROMETER TRIGGER
@@ -282,8 +287,8 @@ int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
  A pulse will be sent out after every movement.  
  Delays should be used in the void loop when calling it out.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-void specTrigger() {
-  Serial.println("Triggering the spectrometer. . .");
+void SpecTrigger() {
+  // Serial.println("Triggering the spectrometer. . .");
   delay(100);
   digitalWrite(trigger,HIGH);
   delay(100);                  
@@ -297,30 +302,30 @@ void specTrigger() {
  This function asks for and sets the direction of the motor
  through the serial monitor.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-void selectDirection() {
-  char dir;
-  while(!directCondition) {
-    Serial.println("\n\n\nWhat direction? (l/L or r/R for left or right) (right = into the beam)");
-    while(!(Serial.available() > 0)) {
-      //wait
-    }
-    char c = Serial.read();
-    if (c=='l' || c=='L') {
-      directVar = 0;
-      directCondition = true;
-    }
-    else if(c=='r' || c=='R') {
-      directVar = 1;
-      directCondition = true;
-    }
-    dir = c;
-  }
-  if(directCondition) {
-    Serial.print("You've selected the ");
-    Serial.print(dir);
-    Serial.println(" direction");  
-  }
-}
+// void selectDirection() {
+//   char dir;
+//   while(!directCondition) {
+//     Serial.println("\n\n\nWhat direction? (l/L or r/R for left or right) (right = into the beam)");
+//     while(!(Serial.available() > 0)) {
+//       //wait
+//     }
+//     char c = Serial.read();
+//     if (c=='l' || c=='L') {
+//       directVar = 0;
+//       directCondition = true;
+//     }
+//     else if(c=='r' || c=='R') {
+//       directVar = 1;
+//       directCondition = true;
+//     }
+//     dir = c;
+//   }
+//   if(directCondition) {
+//     Serial.print("You've selected the ");
+//     Serial.print(dir);
+//     Serial.println(" direction");  
+//   }
+// }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SET NUMBER OF DATA POINTS
@@ -329,21 +334,21 @@ void selectDirection() {
  sets this number for the return, and the move/trigger execution.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void dataPoints() {
-  while(!dataCondition) {
-    Serial.println("\n\n\nHow many spectra will you collect?");
-    while(!(Serial.available() > 0)) {
-      //wait
-    }
-    xDataPoints = Serial.parseInt();
-    if (xDataPoints > 0) {
-      dataCondition = true;
-      Serial.print("You will take ");
-      Serial.print(xDataPoints);
-      Serial.println(" data points at this Z-position.");
-    }
-  }
-}
+// void dataPoints() {
+//   while(!dataCondition) {
+//     Serial.println("\n\n\nHow many spectra will you collect?");
+//     while(!(Serial.available() > 0)) {
+//       //wait
+//     }
+//     xDataPoints = Serial.parseInt();
+//     if (xDataPoints > 0) {
+//       dataCondition = true;
+//       Serial.print("You will take ");
+//       Serial.print(xDataPoints);
+//       Serial.println(" data points at this Z-position.");
+//     }
+//   }
+// }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  INCREMENT SIZE (BETWEEN MEASUREMENTS)
@@ -352,36 +357,36 @@ void dataPoints() {
  This will be based on the stepsize measurement on the driver.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void  setSteps() {
-  char sizeCheck = 'n';
-  while(!stepVerify) {
-    while(sizeCheck != 'y' && sizeCheck != 'Y') {
-      Serial.println("\n\n\nHave you checked the step size.....?");
-      while(!(Serial.available() > 0)) {
-        //wait
-      }
-      sizeCheck = Serial.read();
-      Serial.println(sizeCheck);
-    }
-    Serial.println("\n\n\nHow many steps per increment?");
-    while(!(Serial.available() > 0)) {
-      //wait
-    }
-    int c = Serial.parseInt();
-    if (c > 0 && c < 1000000) {
-      steps = c;
-      stepVerify = true;
-      Serial.print("You've set ");
-      Serial.print(steps);
-      Serial.print(" steps in the ");  
-      Serial.print(directVar);
-      Serial.println(" direction.");
-    }
-  }
-}
+// void  setSteps() {
+//   char sizeCheck = 'n';
+//   while(!stepVerify) {
+//     while(sizeCheck != 'y' && sizeCheck != 'Y') {
+//       Serial.println("\n\n\nHave you checked the step size.....?");
+//       while(!(Serial.available() > 0)) {
+//         //wait
+//       }
+//       sizeCheck = Serial.read();
+//       Serial.println(sizeCheck);
+//     }
+//     Serial.println("\n\n\nHow many steps per increment?");
+//     while(!(Serial.available() > 0)) {
+//       //wait
+//     }
+//     int c = Serial.parseInt();
+//     if (c > 0 && c < 1000000) {
+//       steps = c;
+//       stepVerify = true;
+//       Serial.print("You've set ");
+//       Serial.print(steps);
+//       Serial.print(" steps in the ");  
+//       Serial.print(directVar);
+//       Serial.println(" direction.");
+//     }
+//   }
+// }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  PRINT SETTINGS TO SERIAL MONITOR
+  GetSettings: PRINT SETTINGS TO SERIAL MONITOR
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
  
 void GetSettings() {
@@ -399,7 +404,60 @@ void GetSettings() {
   // xDataPoints:
   Serial.print("Number of Measurements [x-axis]: ");
   Serial.println(xDataPoints);
-  // steps:
-  Serial.print("Steps per Measurement: ");
-  Serial.println(steps);
+  // zDataPoints:
+  Serial.print("Number of Measurements [z-axis]: ");
+  Serial.println(zDataPoints);
+  // x steps:
+  Serial.print("Steps per Measurement [x-axis]: ");
+  Serial.println(xSteps);
+  // z steps:
+  Serial.print("Steps per Measurement [z-axis]: ");
+  Serial.println(zSteps);
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  SetDirection: SET DIRECTION VARIABLE (duh)
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+void SetDirection(String dir) {
+  directVar = parseInt(dir);
+  Serial.print("\nDirection set to: ");
+  Serial.print(dir);
+  Serial.println("\n");
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  SetXMeasurements / SetZMeasurements: SET # OF MEASUREMENTS TO TAKE IN X OR Z DIRECTION
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+void SetXMeasurements(String points) {
+  xDataPoints = parseInt(points);
+  Serial.print("\nX data points set to: ");
+  Serial.print(points);
+  Serial.println("\n");
+}
+
+void SetZMeasurements(String points) {
+  zDataPoints = parseInt(points);
+  Serial.print("\nZ data points set to: ");
+  Serial.print(points);
+  Serial.println("\n");
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  SetXSteps / SetZSteps: SET # OF STEPS BETWEEN MEASUREMENTS IN X OR Z DIRECTION
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+void SetXSteps(String steps) {
+  xSteps = parseInt(steps);
+  Serial.print("\nZ steps set to: ");
+  Serial.print(steps);
+  Serial.println("\n");
+}
+
+void SetZSteps(String steps) {
+  zSteps = parseInt(steps);
+  Serial.print("\nZ steps set to: ");
+  Serial.print(steps);
+  Serial.println("\n");
 }
