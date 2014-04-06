@@ -42,8 +42,8 @@ void setup() {
   Serial.begin(115200);
   while(!Serial);
   Serial.println("\nEnter commands like this:");
-  Serial.println("Command,parameter1,parameter2. [no spaces please]");
-  Serial.println("(Type 'help' for a list of commands)\n");
+  Serial.println("Command,parameter1,parameter2. [no spaces]");
+  PrintHelp();
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -69,11 +69,13 @@ void loop() {
 
 void PrintHelp() {
   Serial.println("\n\nWelcome to our help menu!\n");
-  Serial.println("----- Available Commands: -----");
+  Serial.println("----- Available Commands: -----\n");
   Serial.println("GetSettings ()");
-  Serial.println(" - print all settings variables to the screen.");
+  Serial.println(" - print all settings variables to the screen.\n");
   Serial.println("GetSpectrum ()");
-  Serial.println(" - gets spectrum at current location.");
+  Serial.println(" - gets spectrum at current location.\n");
+  Serial.println("Help ()");
+  Serial.println(" - prints functions available to be run.\n");
   Serial.println("MoveMotor ()");
   Serial.println(" - moves motor in x direction only AND not back & forth.");
   Serial.println(" - params:\n");
@@ -91,7 +93,7 @@ void PrintHelp() {
   Serial.println(" - params: steps = # steps for motor to move between each measurement [x-axis].\n");
   Serial.println("SetZSteps (int steps)");
   Serial.println(" - params: steps = # steps for motor to move between each measurement [z-axis].\n");
-  Serial.println("\n\nType a command!");
+  Serial.println("\n\nNow type a command!");
   
   // Other possibly useful commands:
   // Serial.println("ReturnMotor ()");
