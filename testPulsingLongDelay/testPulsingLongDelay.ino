@@ -12,7 +12,9 @@ int zMotor = 8;
 int xSteps = 0;          //This is the number of steps we'll move the motor.  Default to zero steps for safety.
 int zSteps = 0;
 // 0 = 0th interrupt, but on pin 2.
-int limitSwitch = 1;   //We will be using this pin for the limit switch motor stop function.  
+// 1 = 1st interrupt, but on pin 3. [didn't work until using correct circuit - pull up resistors and such.
+int limitSwitchBlue = 1;   //We will be using this pin for the limit switch motor stop function.  
+int limitSwitchWhite = 0;
 int trigger = 13;       //This pin will be used to trigger the spectrometer. 
 int interrupt = A0;      //The interrupat pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
 int xDirectVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
@@ -40,7 +42,8 @@ void setup() {
   pinMode(xMotor,OUTPUT);
   pinMode(zMotor,OUTPUT);
   //pinMode(2,INPUT);
-  //attachInterrupt(limitSwitch, pinChanged, LOW);
+  //attachInterrupt(limitSwitchBlue, closeLimitHit, LOW);
+  //attachInterrupt(limitSwitchWhite, farLimitHit, LOW);
   pinMode(trigger,OUTPUT);
   digitalWrite(trigger,LOW);
   delay(1000);
@@ -59,9 +62,14 @@ void loop() {
   ExecuteMeasurement();
 }
 
-void pinChanged() {
+void closeLimitHit() {
   systemOkay = false;
-  Serial.println("\n\n========Limit Hit!!!!!!!==========\n\n");
+  Serial.println("\n\n========Close Limit Hit!!!!!!!==========\n\n");
+}
+
+void farLimitHit() {
+  systemOkay = false;
+  Serial.println("\n\n========Far Limit Hit!!!!!!!==========\n\n");
 }
 
   /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -88,21 +96,21 @@ void pinChanged() {
       int h = 1;
       if (c == 'y' || c == 'Y') {
         for (int i = zIncrement; i > 0; i--) {
-          moveMotor(zDirectVar,zSteps,zMotor);
+          moveMotor(zDirectVar,zDirectPin,zSteps,zMotor);
           for (int i = xDataPoints; i > 0; i--) {
-            g = moveMotor(xDirectVar,xSteps,xMotor);
+            g = moveMotor(xDirectVar,xDirectPin,xSteps,xMotor);
             delay(100);
             specTrigger();
             delay(100);
           }
           
-          h = returnMotor(xDirectVar,xSteps,xDataPoints,xMotor);
+          h = returnMotor(xDirectVar,xDirectPin,xSteps,xDataPoints,xMotor);
           if (g == 0 || h == 0) {
             Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
           }
         }
         
-        returnMotor(zDirectVar,zSteps,zIncrement,zMotor);
+        returnMotor(zDirectVar,zDirectPin,zSteps,zIncrement,zMotor);
         
         xMeasureExecute = true;
       } 
@@ -127,8 +135,8 @@ void pinChanged() {
  by the set number of steps.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-int moveMotor(int dir, int stepNumber, int motorChoice) {
-  digitalWrite(xDirectPin,dir);
+int moveMotor(int dir, int dirPin, int stepNumber, int motorChoice) {
+  digitalWrite(dirPin,dir);
   Serial.print("Moving the stepper motor in the ");
   Serial.print(dir);
   Serial.println(" direction.");
@@ -159,7 +167,7 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
  we should create a return home position.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
+int returnMotor(int dir,int dirPin, int stepNumber, int dataPoints, int motorChoice) {
   boolean returnCondition = false;
   while(!returnCondition) {
     Serial.println("\n\n\nReady to return motor?");
@@ -181,8 +189,8 @@ int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
   Serial.print(" direction, by ");
   Serial.print(stepLength);
   Serial.println(" steps");
-  dir = !dir;
-  int g = moveMotor(dir,stepLength,motorChoice);
+  int newDir = !dir;
+  int g = moveMotor(newDir,dirPin,stepLength,motorChoice);
   //directCondition = false;
   //stepVerify = false;
   //dataCondition = false;
