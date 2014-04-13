@@ -5,19 +5,26 @@
  
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-
-int directPin = 7;      //This pin sets the directPinion for the motor to move.  We may need two of these outputs for the z-directPinion.
-int xMotor = 6;         //This pin is the pulse output for the X-direction motor.  Again, we may need two of these pins.
-int steps = 0;          //This is the number of steps we'll move the motor.  Default to zero steps for safety.
-int limitSwitch = 12;   //We will be using this pin for the limit switch motor stop function.  
+int xDirectPin = 7;      //This pin sets the x Direction Pin for the x motor to move.
+int zDirectPin = 9;      //This pin sets the z Direction Pin for the z motor
+int xMotor = 6;         //This pin is the pulse output for the X-direction motor.
+int zMotor = 8;
+int xSteps = 0;          //This is the number of steps we'll move the motor.  Default to zero steps for safety.
+int zSteps = 0;
+// 0 = 0th interrupt, but on pin 2.
+int limitSwitch = 1;   //We will be using this pin for the limit switch motor stop function.  
 int trigger = 13;       //This pin will be used to trigger the spectrometer. 
-int interrupt = A0;      //The interrupt pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
-int directVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
-boolean directCondition = false; //The variable used to verify the direction of the motor movement.
-boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
-boolean dataCondition = false;
-int xDataPoints = 0; 
+int interrupt = A0;      //The interrupat pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
+int xDirectVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
+int zDirectVar = 0;
+//boolean directCondition = false; //The variable used to verify the direction of the motor movement.
+//boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
+//boolean dataCondition = false;
+int xDataPoints = 0;
+int zIncrement = 0;
 int variable = 1;
+
+volatile boolean systemOkay = true; // volatile means variable could change at any moment.
 
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -28,9 +35,12 @@ int variable = 1;
 
 void setup() {
   pinMode(interrupt,INPUT);
-  pinMode(directPin,OUTPUT);
+  pinMode(xDirectPin,OUTPUT);
+  pinMode(zDirectPin,OUTPUT);
   pinMode(xMotor,OUTPUT);
-  pinMode(limitSwitch,INPUT);
+  pinMode(zMotor,OUTPUT);
+  //pinMode(2,INPUT);
+  //attachInterrupt(limitSwitch, pinChanged, LOW);
   pinMode(trigger,OUTPUT);
   digitalWrite(trigger,LOW);
   delay(1000);
@@ -49,6 +59,11 @@ void loop() {
   ExecuteMeasurement();
 }
 
+void pinChanged() {
+  systemOkay = false;
+  Serial.println("\n\n========Limit Hit!!!!!!!==========\n\n");
+}
+
   /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    EXECUTE CODE
    
@@ -58,8 +73,11 @@ void loop() {
   void ExecuteMeasurement() {
     boolean xMeasureExecute = false;
     dataPoints();
-    selectDirection();
-    setSteps();
+    setZIncrement();
+    selectXDirection();
+    selectZDirection();
+    setXSteps();
+    setZSteps();
     while (!xMeasureExecute) {
       Serial.println("Run. . .? (Y/n)");
       while (!(Serial.available() > 0)) {
@@ -69,17 +87,23 @@ void loop() {
       int g = 1;
       int h = 1;
       if (c == 'y' || c == 'Y') {
-        for (int i = xDataPoints; i > 0; i--) {
-          g = moveMotor(directVar,steps,xMotor);
-          delay(100);
-          specTrigger();
-          delay(100);
+        for (int i = zIncrement; i > 0; i--) {
+          moveMotor(zDirectVar,zSteps,zMotor);
+          for (int i = xDataPoints; i > 0; i--) {
+            g = moveMotor(xDirectVar,xSteps,xMotor);
+            delay(100);
+            specTrigger();
+            delay(100);
+          }
+          
+          h = returnMotor(xDirectVar,xSteps,xDataPoints,xMotor);
+          if (g == 0 || h == 0) {
+            Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
+          }
         }
         
-        h = returnMotor(directVar,steps,xDataPoints,xMotor);
-        if (g == 0 || h == 0) {
-          Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
-        }
+        returnMotor(zDirectVar,zSteps,zIncrement,zMotor);
+        
         xMeasureExecute = true;
       } 
       else if (c == 'n' || c == 'N') {
@@ -104,7 +128,7 @@ void loop() {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 int moveMotor(int dir, int stepNumber, int motorChoice) {
-  digitalWrite(directPin,dir);
+  digitalWrite(xDirectPin,dir);
   Serial.print("Moving the stepper motor in the ");
   Serial.print(dir);
   Serial.println(" direction.");
@@ -117,11 +141,12 @@ int moveMotor(int dir, int stepNumber, int motorChoice) {
     // - When interrupt happens, assign a variable to false
     // - in this loop, we continue to check if this variable is true. Once it goes
     //   false, we stop looping and print out the error to the console log.
-
-    digitalWrite(motorChoice,HIGH);
-    delay(100);
-    digitalWrite(motorChoice,LOW);
-    delay(100);
+    if (systemOkay) {
+      digitalWrite(motorChoice,HIGH);
+      delay(10);
+      digitalWrite(motorChoice,LOW);
+      delay(10);
+    }
   }
   return 1;
 }
@@ -158,9 +183,9 @@ int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
   Serial.println(" steps");
   dir = !dir;
   int g = moveMotor(dir,stepLength,motorChoice);
-  directCondition = false;
-  stepVerify = false;
-  dataCondition = false;
+  //directCondition = false;
+  //stepVerify = false;
+  //dataCondition = false;
   return g;
 }
 
@@ -174,10 +199,12 @@ int returnMotor(int dir, int stepNumber, int dataPoints, int motorChoice) {
 void specTrigger() {
   Serial.println("Triggering the spectrometer. . .");
   delay(100);
-  digitalWrite(trigger,HIGH);
-  delay(100);                  
-  digitalWrite(trigger,LOW);
-  delay(100);
+  if (systemOkay) {
+    digitalWrite(trigger,HIGH);
+    delay(100);                  
+    digitalWrite(trigger,LOW);
+    delay(100);
+  }
 }
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  DIRECTION SELECTION 
@@ -186,20 +213,21 @@ void specTrigger() {
  through the serial monitor.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void selectDirection() {
+void selectXDirection() {
+  boolean directCondition = false;
   char dir;
   while(!directCondition) {
-    Serial.println("\n\n\nWhat direction? (l/L or r/R for left or right) (right = into the beam)");
+    Serial.println("\n\n\nWhat direction (x-axis)? (l/L or r/R for left or right) (right = into the beam)");
     while(!(Serial.available() > 0)) {
       //wait
     }
     char c = Serial.read();
     if (c=='l' || c=='L') {
-      directVar = 0;
+      xDirectVar = 0;
       directCondition = true;
     }
     else if(c=='r' || c=='R') {
-      directVar = 1;
+      xDirectVar = 1;
       directCondition = true;
     }
     dir = c;
@@ -207,7 +235,33 @@ void selectDirection() {
   if(directCondition) {
     Serial.print("You've selected the ");
     Serial.print(dir);
-    Serial.println(" direction");  
+    Serial.println(" direction for x");  
+  }
+}
+
+void selectZDirection() {
+  boolean directCondition = false;
+  char dir;
+  while(!directCondition) {
+    Serial.println("\n\n\nWhat direction (z-axis)? (l/L or r/R for left or right) (right = forward / away from motor)");
+    while(!(Serial.available() > 0)) {
+      //wait
+    }
+    char c = Serial.read();
+    if (c=='l' || c=='L') {
+      zDirectVar = 1;
+      directCondition = true;
+    }
+    else if(c=='r' || c=='R') {
+      zDirectVar = 0;
+      directCondition = true;
+    }
+    dir = c;
+  }
+  if(directCondition) {
+    Serial.print("You've selected the ");
+    Serial.print(dir);
+    Serial.println(" direction for z");  
   }
 }
 
@@ -219,8 +273,9 @@ void selectDirection() {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void dataPoints() {
+  boolean dataCondition = false;
   while(!dataCondition) {
-    Serial.println("\n\n\nHow many spectra will you collect?");
+    Serial.println("\n\n\nHow many spectra will you collect? (x-axis)");
     while(!(Serial.available() > 0)) {
       //wait
     }
@@ -234,6 +289,23 @@ void dataPoints() {
   }
 }
 
+void setZIncrement() {
+  boolean dataCondition = false;
+  while(!dataCondition) {
+    Serial.println("\n\n\nHow many z positions do you want to measure?");
+    while(!(Serial.available() > 0)) {
+      //wait
+    }
+    zIncrement = Serial.parseInt();
+    if (zIncrement > 0) {
+      dataCondition = true;
+      Serial.print("You will take ");
+      Serial.print(zIncrement);
+      Serial.println(" sets of spectra.");
+    }
+  }
+}
+
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  INCREMENT SIZE (BETWEEN MEASUREMENTS)
  
@@ -241,30 +313,60 @@ void dataPoints() {
  This will be based on the stepsize measurement on the driver.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-void  setSteps() {
+void  setXSteps() {
+  boolean stepVerify = false;
   char sizeCheck = 'n';
   while(!stepVerify) {
     while(sizeCheck != 'y' && sizeCheck != 'Y') {
-      Serial.println("\n\n\nHave you checked the step size.....?");
+      Serial.println("\n\n\nHave you checked the x step size.....?");
       while(!(Serial.available() > 0)) {
         //wait
       }
       sizeCheck = Serial.read();
       Serial.println(sizeCheck);
     }
-    Serial.println("\n\n\nHow many steps per increment?");
+    Serial.println("\n\n\nHow many x steps per increment?");
     while(!(Serial.available() > 0)) {
       //wait
     }
     int c = Serial.parseInt();
     if (c > 0 && c < 1000000) {
-      steps = c;
+      xSteps = c;
       stepVerify = true;
       Serial.print("You've set ");
-      Serial.print(steps);
+      Serial.print(xSteps);
       Serial.print(" steps in the ");  
-      Serial.print(directVar);
-      Serial.println(" direction.");
+      Serial.print(xDirectVar);
+      Serial.println(" x direction.");
+    }
+  }
+}
+
+void  setZSteps() {
+  boolean stepVerify = false;
+  char sizeCheck = 'n';
+  while(!stepVerify) {
+    while(sizeCheck != 'y' && sizeCheck != 'Y') {
+      Serial.println("\n\n\nHave you checked the z step size.....?");
+      while(!(Serial.available() > 0)) {
+        //wait
+      }
+      sizeCheck = Serial.read();
+      Serial.println(sizeCheck);
+    }
+    Serial.println("\n\n\nHow many steps between each z position?");
+    while(!(Serial.available() > 0)) {
+      //wait
+    }
+    int c = Serial.parseInt();
+    if (c > 0 && c < 1000000) {
+      zSteps = c;
+      stepVerify = true;
+      Serial.print("You've set ");
+      Serial.print(zSteps);
+      Serial.print(" steps in the ");  
+      Serial.print(zDirectVar);
+      Serial.println(" z direction.");
     }
   }
 }
@@ -286,7 +388,7 @@ void  setSteps() {
  break;
  case 'r':
  case 'R':
- directVar = 0;
+ directVar = 0;   
  directCondition = true;
  break;
  default:
