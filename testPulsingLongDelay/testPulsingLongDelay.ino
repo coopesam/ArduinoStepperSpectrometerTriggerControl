@@ -1,9 +1,13 @@
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- Things to do: 1) Make stepper acceleration ramp (most likely through a function of delay() length decreases).
- 2) add in the limit switch abort to the moveMotor() command
- 3) Add in the z-direction motor
- 
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/* 2D Stepper Motor Pulsed Spectrometer
+ * 
+ * Drives two stepper motors for a two-dimensional reach.
+ * Also sends pulses to spectrometer for data collection,
+ * spectrometer = Avaspec-3648
+ *
+ * Authors:
+ * - Alex Beaman
+ * - Samuel Cooper
+ */
 
 int xDirectPin = 7;      //This pin sets the x Direction Pin for the x motor to move.
 int zDirectPin = 9;      //This pin sets the z Direction Pin for the z motor
@@ -13,18 +17,14 @@ int xSteps = 0;          //This is the number of steps we'll move the motor.  De
 int zSteps = 0;
 // 0 = 0th interrupt, but on pin 2.
 // 1 = 1st interrupt, but on pin 3. [didn't work until using correct circuit - pull up resistors and such.
-int limitSwitchBlue = 1;   //We will be using this pin for the limit switch motor stop function.  
-int limitSwitchWhite = 0;
+int limitSwitchWhite = 0;   //We will be using this pin for the limit switch motor stop function.  
+int limitSwitchBlue = 1;
 int trigger = 13;       //This pin will be used to trigger the spectrometer. 
-int interrupt = A0;      //The interrupat pin used for the limit switches on the stage so that nothing can break.  Used to abort moveMotor() function.
 int xDirectVar = 0;      //This variable is either 0 or 1 or true or false, which will be read as the direction of the motor.
 int zDirectVar = 0;
-//boolean directCondition = false; //The variable used to verify the direction of the motor movement.
-//boolean stepVerify = false; //The variable used to verify the stepsize before moving and setting the number of steps.
-//boolean dataCondition = false;
+
 int xDataPoints = 0;
-int zIncrement = 0;
-int variable = 1;
+int zScans = 0;
 
 volatile boolean systemOkay = true; // volatile means variable could change at any moment.
 
@@ -36,20 +36,21 @@ volatile boolean systemOkay = true; // volatile means variable could change at a
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void setup() {
-  pinMode(interrupt,INPUT);
+  // Direction pins:
   pinMode(xDirectPin,OUTPUT);
   pinMode(zDirectPin,OUTPUT);
+  // Stepper motor pins:
   pinMode(xMotor,OUTPUT);
   pinMode(zMotor,OUTPUT);
-  //pinMode(2,INPUT);
-  //attachInterrupt(limitSwitchBlue, closeLimitHit, LOW);
-  //attachInterrupt(limitSwitchWhite, farLimitHit, LOW);
+  // Interrupts for limit switches:
+  //attachInterrupt(limitSwitchBlue, closeLimitHit, FALLING);
+  //attachInterrupt(limitSwitchWhite, farLimitHit, FALLING);
+  // Spectrometer pin:
   pinMode(trigger,OUTPUT);
   digitalWrite(trigger,LOW);
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
-
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -78,15 +79,15 @@ void farLimitHit() {
    This code combines all of the commands together and runs a program.
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
-  void ExecuteMeasurement() {
-    boolean xMeasureExecute = false;
+void ExecuteMeasurement() {
+  boolean execute = false;
     dataPoints();
-    setZIncrement();
+    setZScans();
     selectXDirection();
     selectZDirection();
     setXSteps();
     setZSteps();
-    while (!xMeasureExecute) {
+    while (!execute) {
       Serial.println("Run. . .? (Y/n)");
       while (!(Serial.available() > 0)) {
         //wait 
@@ -95,8 +96,7 @@ void farLimitHit() {
       int g = 1;
       int h = 1;
       if (c == 'y' || c == 'Y') {
-        for (int i = zIncrement; i > 0; i--) {
-          moveMotor(zDirectVar,zDirectPin,zSteps,zMotor);
+        for (int i = zScans; i > 0; i--) {
           for (int i = xDataPoints; i > 0; i--) {
             g = moveMotor(xDirectVar,xDirectPin,xSteps,xMotor);
             delay(100);
@@ -108,20 +108,21 @@ void farLimitHit() {
           if (g == 0 || h == 0) {
             Serial.println("\n\n\n ERROR: The movement was exitted due to a failure to communicate.");
           }
+          moveMotor(zDirectVar,zDirectPin,zSteps,zMotor);
         }
         
-        returnMotor(zDirectVar,zDirectPin,zSteps,zIncrement,zMotor);
+        returnMotor(zDirectVar,zDirectPin,zSteps,zScans,zMotor);
         
-        xMeasureExecute = true;
+        execute = true;
       } 
       else if (c == 'n' || c == 'N') {
         Serial.println("Why not? You should close the serial port and start over now. \n\n");
       } 
       else {
-
+        Serial.println("Unrecognized command");
       }
     } 
-  }
+}
 
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,14 +143,7 @@ int moveMotor(int dir, int dirPin, int stepNumber, int motorChoice) {
   Serial.println(" direction.");
   delay(80);
   for (int i = stepNumber; i > 0; i--) {
-    // if (analogRead(interrupt) < 0) {    //This is the interrupt code for the limit switch.  If the stage is ever moving and there is a voltage across the 
-    //   return 0;                         //the limit switch pin, the code for move will stop. We need to figure out how to write measure the limit voltage. 
-    // }                                   //(using the circuit Dr. Durfee and I  talked about).
-    // Alex's idea:
-    // - When interrupt happens, assign a variable to false
-    // - in this loop, we continue to check if this variable is true. Once it goes
-    //   false, we stop looping and print out the error to the console log.
-    if (systemOkay) {
+    if (systemOkay) { // systemOkay is the variable to make sure the motor is not going to hit and end.
       digitalWrite(motorChoice,HIGH);
       delay(10);
       digitalWrite(motorChoice,LOW);
@@ -169,7 +163,7 @@ int moveMotor(int dir, int dirPin, int stepNumber, int motorChoice) {
 
 int returnMotor(int dir,int dirPin, int stepNumber, int dataPoints, int motorChoice) {
   boolean returnCondition = false;
-  while(!returnCondition) {
+  /*while(!returnCondition) {
     Serial.println("\n\n\nReady to return motor?");
     while(!(Serial.available() > 0)) {
       //wait
@@ -182,7 +176,7 @@ int returnMotor(int dir,int dirPin, int stepNumber, int dataPoints, int motorCho
       Serial.println('\n\n\n\n\n\n\n\nBUMMER!');
       returnCondition = false;
     }
-  }
+  }*/
   int stepLength = stepNumber * dataPoints;
   Serial.print("Returning the stepper motor from the ");
   Serial.print(dir);
@@ -191,9 +185,6 @@ int returnMotor(int dir,int dirPin, int stepNumber, int dataPoints, int motorCho
   Serial.println(" steps");
   int newDir = !dir;
   int g = moveMotor(newDir,dirPin,stepLength,motorChoice);
-  //directCondition = false;
-  //stepVerify = false;
-  //dataCondition = false;
   return g;
 }
 
@@ -297,18 +288,18 @@ void dataPoints() {
   }
 }
 
-void setZIncrement() {
+void setZScans() {
   boolean dataCondition = false;
   while(!dataCondition) {
-    Serial.println("\n\n\nHow many z positions do you want to measure?");
+    Serial.println("\n\n\nHow many different z scans do you want to take?");
     while(!(Serial.available() > 0)) {
       //wait
     }
-    zIncrement = Serial.parseInt();
-    if (zIncrement > 0) {
+    zScans = Serial.parseInt();
+    if (zScans > 0) {
       dataCondition = true;
       Serial.print("You will take ");
-      Serial.print(zIncrement);
+      Serial.print(zScans);
       Serial.println(" sets of spectra.");
     }
   }
@@ -378,41 +369,3 @@ void  setZSteps() {
     }
   }
 }
-
-/* My first attempt at creating a function that verfies inputs, and sets global values.
- 
- void selectDirection() { 
- if (!directCondition) {
- Serial.println("What direction?");
- while (!directCondition) {
- if(Serial.available() > 0 ){
- char c;
- c = Serial.read();
- switch (c) {
- case 'l':
- case 'L':
- directVar = 1;
- directCondition = true;
- break;
- case 'r':
- case 'R':
- directVar = 0;   
- directCondition = true;
- break;
- default:
- Serial.println("Pick a value L/l or R/r for left or right");
- break;
- }
- if(directCondition){
- Serial.print("You've selected the ");
- Serial.print(directVar);
- Serial.println(" direction");
- }
- }
- }
- } 
- else {  
- }
- }*/
- //boobs
-
