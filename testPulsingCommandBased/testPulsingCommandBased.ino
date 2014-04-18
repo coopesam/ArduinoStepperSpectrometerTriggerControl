@@ -24,6 +24,14 @@ int xDataPoints = 0;
 int zDataPoints = 0;
 int variable = 1;
 
+char inData[20]; // Allocate some space for the string
+char inChar=-1; // Where to store the character read
+byte index = 0; // Index into array; where to store the character
+
+String command = "";
+String param1 = "";
+String param2 = "";
+
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  SETUP
  
@@ -41,10 +49,13 @@ void setup() {
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
+<<<<<<< HEAD
   Serial.write("Power On");
   //Serial.println("\nEnter commands like this:");
   //Serial.println("Command,parameter1,parameter2. [no spaces]");
   //PrintHelp();
+=======
+>>>>>>> FETCH_HEAD
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -52,7 +63,38 @@ void setup() {
  
  The body of our Arduino action.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+// from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
 
+//char[20] Comp(char* This) {
+String Comp() {
+    char data[20];
+//void loop() {
+    while (Serial.available() > 0) // Don't read unless
+    {                              // there you know there is data
+        if(index < 19) // One less than the size of the array
+        {
+            inChar = Serial.read(); // Read a character
+            data[index] = inChar; // Store it
+            index++; // Increment where to write next
+            data[index] = '\0'; // Null terminate the string
+        }
+    }
+    
+    index = 0;
+    
+    return data;
+
+    /*if (index != 0) {
+        Serial.print("Run Commands now: ");
+        Serial.println(inData);
+        for (int i=0;i<19;i++) {
+            inData[i]=0;
+        }
+        index=0;
+    }*/
+}
+
+<<<<<<< HEAD
 void loop() {
   // from http://stackoverflow.com/questions/5697047/convert-serial-read-into-a-useable-string-using-arduino
   String command = "";
@@ -67,6 +109,24 @@ void loop() {
     param2 = Serial.readStringUntil('.');
     runCommand(command, param1, param2);
   }
+=======
+void loop()
+{
+    delay(500);
+    command = Comp();
+    if (inData != "") {
+      Serial.println(command);
+    }
+    /*if (Comp("m1 on")==0) {
+        Serial.write("Motor 1 -> Online\n");
+    }
+    if (Comp("m1 off")==0) {
+        Serial.write("Motor 1 -> Offline\n");
+    }
+    if (Comp("help")==0) {
+      PrintHelp();
+    }*/
+>>>>>>> FETCH_HEAD
 }
 
 void PrintHelp() {
