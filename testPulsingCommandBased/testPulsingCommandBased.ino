@@ -41,9 +41,10 @@ void setup() {
   delay(1000);
   Serial.begin(115200);
   while(!Serial);
-  Serial.println("\nEnter commands like this:");
-  Serial.println("Command,parameter1,parameter2. [no spaces]");
-  PrintHelp();
+  Serial.write("Power On");
+  //Serial.println("\nEnter commands like this:");
+  //Serial.println("Command,parameter1,parameter2. [no spaces]");
+  //PrintHelp();
 }
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -60,6 +61,7 @@ void loop() {
 
   if(Serial.available() > 0)
   {
+    Serial.println("Reading command");
     command = Serial.readStringUntil(',');
     param1 = Serial.readStringUntil(',');
     param2 = Serial.readStringUntil('.');
@@ -105,7 +107,7 @@ void PrintHelp() {
 }
 
 void runCommand(String cmd, String p1, String p2) {
-    int err = 0;
+    Serial.println("running command");
     cmd.toLowerCase();
     if ( cmd.equals("help") ) {
       PrintHelp();
@@ -240,7 +242,7 @@ void MoveMotor(int directions) {
   }
   Serial.println(" direction.");
   
-  for (int i = 0; i < steps; i++) {
+  for (int i = 0; i < xSteps; i++) {
     // if (!atLimit) { // limit switches activate this variable
       digitalWrite(xMotor, HIGH);
       delay(100);
@@ -251,7 +253,7 @@ void MoveMotor(int directions) {
 
   if (directions == 2) {
     directVar = !directVar;
-    ReturnMotor(0);
+    MoveMotor(0);
   } else if (directions == 0) {
     directVar = !directVar;
   } else {
@@ -422,7 +424,7 @@ void GetSettings() {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void SetDirection(String dir) {
-  directVar = parseInt(dir);
+  directVar = dir.toInt();
   Serial.print("\nDirection set to: ");
   Serial.print(dir);
   Serial.println("\n");
@@ -433,14 +435,14 @@ void SetDirection(String dir) {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void SetXMeasurements(String points) {
-  xDataPoints = parseInt(points);
+  xDataPoints = points.toInt();
   Serial.print("\nX data points set to: ");
   Serial.print(points);
   Serial.println("\n");
 }
 
 void SetZMeasurements(String points) {
-  zDataPoints = parseInt(points);
+  zDataPoints = points.toInt();
   Serial.print("\nZ data points set to: ");
   Serial.print(points);
   Serial.println("\n");
@@ -451,14 +453,14 @@ void SetZMeasurements(String points) {
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 void SetXSteps(String steps) {
-  xSteps = parseInt(steps);
+  xSteps = steps.toInt();
   Serial.print("\nZ steps set to: ");
   Serial.print(steps);
   Serial.println("\n");
 }
 
 void SetZSteps(String steps) {
-  zSteps = parseInt(steps);
+  zSteps = steps.toInt();
   Serial.print("\nZ steps set to: ");
   Serial.print(steps);
   Serial.println("\n");
